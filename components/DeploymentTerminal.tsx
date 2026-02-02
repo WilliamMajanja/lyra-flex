@@ -9,8 +9,8 @@ const DeploymentTerminal: React.FC = () => {
     common: {
       title: "common.yml (Base Provisioning)",
       description: "Applies RT-Kernel, PCIe Gen 3, and Minima services.",
-      code: `- name: Aura Trinity Base Setup
-  hosts: trinity_cluster
+      code: `- name: Reflex Base Setup
+  hosts: reflex_cluster
   tasks:
     - name: Install Headless Dependencies
       apt:
@@ -38,7 +38,7 @@ const DeploymentTerminal: React.FC = () => {
       code: `- name: Load RAVE .hef model to NPU
   copy:
     src: models/rave_synth_v4.hef
-    dest: /opt/aura/models/`
+    dest: /opt/reflex/models/`
     },
     broadcast: {
       title: "broadcast.yml (FM Transmitter)",

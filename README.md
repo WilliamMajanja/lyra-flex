@@ -1,32 +1,33 @@
-# LyraFlex PRO (Aura Trinity Cluster) 🎸🔊
+# LyraFlex | Kilele Festival 2026 🎸🔊
 
-### The World's First AI-Native, Decentralized Audio Workstation
-**LyraFlex PRO** is a high-fidelity performance environment built on the **Aura Trinity** systems architecture. Designed for the **Kilele 2026 Initiative**, it transforms a cluster of Raspberry Pi 5s into a context-aware neural audio suite that bridges the gap between raw hardware telemetry and creative synthesis.
+### The World's First AI-Native Performance Workstation
+**LyraFlex** is a high-fidelity performance environment built as an installation for the **Kilele Festival 2026**. This project is a flagship collaboration engineered by **Infinity Collaborations**, **Minima**, and **Reflex**.
 
 ---
 
 ## 💎 Core Architectural Pillars
 
-### 1. Neural Co-Producer (Gemini 3 Pro)
-The workstation features a deep integration with Google's Gemini 3 Pro model. Unlike standard chat assistants, the **Neural Co-Producer** is "DAW-Aware":
-- **Contextual Analysis**: It reads your sequencer's active steps, BPM, and mastering levels in real-time.
-- **Neural Directives**: It provides actionable production advice (e.g., "Increase Kick_808 saturation to 0.75 and shift engine to Mixxx for better transient response").
-- **Hardware Optimization**: Advises on RPi 5 core affinity and PCIe Gen 3 bus lane configuration.
+### 1. Built on Reflex
+LyraFlex is powered by the **Reflex** systems architecture, designed for ultra-low latency audio processing on edge hardware:
+- **RT-Kernel Mesh**: Synchronized real-time kernels across a cluster of Raspberry Pi 5 nodes.
+- **Neural Co-Producer**: Deeply integrated Gemini 3 Pro model acting as a DAW-aware performance assistant.
+- **Hardware Optimization**: Native PCIe Gen 3 bus lane configuration for maximum data throughput.
 
-### 2. Obsidian Studio UI
-A high-precision, 3-column ergonomic workspace designed for live performance:
-- **Global Nav Rail**: Rapid access between the Performance Deck and Infrastructure Management.
-- **Central Workspace**: 16-step high-fidelity sequencer with per-track gain, polymetric end-points, and NPU target routing.
-- **Neural Deck**: A reactive command center for instruction-based production and system diagnostics.
+### 2. Blockchain Powered by Minima
+All performance integrity, identity verification, and asset provenance are handled natively on-chain:
+- **Decentralized Registry**: Every performance capture is hashed and recorded on the Minima protocol.
+- **Smart Contract Auth**: Secure workstation licensing and access control via Minima-powered contracts.
+- **Provenance Tracking**: Lossless STEMS are automatically minted with provenance metadata for copyright protection.
 
-### 3. Pro Mastering & Synthesis
-- **High-Fidelity Engine**: Custom multi-stage synthesis (exponential pitch sweeps for kicks, resonant noise for snares).
-- **Mastering Chain**: Integrated Limiter, Saturation (Valve Drive), Stereo Imager, and Neural Air (EQ) directly influencing the Web Audio graph.
-- **Low Latency**: Optimized for 0.8ms I/O parity using PipeWire native protocols.
+### 3. Installation For Kilele Festival
+Specifically tuned for the **Kilele Festival 2026** by **Infinity Collaborations**:
+- **Obsidian Studio UI**: A high-precision, 3-column ergonomic workspace designed for live performance environments.
+- **Multi-Node Synthesis**: Distributed synthesis engines across Nebula, Pulse, and Brain nodes.
+- **Direct Master Capture**: Seamless recording and mastering suite integrated into the performance flow.
 
 ---
 
-## 🏗 Distributed Hardware Layout
+## 🏗 Distributed Hardware Layout (Reflex Node-Mesh)
 | Node | Code | Role | Engine |
 | :--- | :--- | :--- | :--- |
 | **FX-01** | The Nebula | Neural Timbre & Pad Synth | ZynAddSubFX / AirLLM |
@@ -35,28 +36,23 @@ A high-precision, 3-column ergonomic workspace designed for live performance:
 
 ---
 
-## 💰 Monetization & Provenance
-LyraFlex PRO automates the transition from "Live Show" to "Digital Asset" via the **Minima Blockchain**:
-1. **Direct Master Capture**: Lossless recording directly to NVMe.
-2. **Blockchain Verification**: Automatic minting of performance hashes for copyright protection.
-3. **Asset Export**: Package mastered STEMS and session metadata with one-click decentralized registry.
-
----
-
 ## 🛠 Tech Stack & Dependencies
 - **AI Core**: Gemini 3 Pro (via @google/genai)
+- **Blockchain**: Minima (Native Node Integration)
 - **Frontend**: React 19, Tailwind CSS, Framer Motion
 - **Audio**: Web Audio API (Native Node Graph)
-- **Infrastructure**: Minima (Blockchain), Hailo-8 (NPU Emulation), RPi 5 (Target Hardware)
+- **Infrastructure**: Reflex Framework on RPi 5 (Target Hardware)
 
 ---
 
-## 🚀 Getting Started
-1. **Initialize Cluster**: Ensure all RPi nodes are on the same subnet with RT-Kernels active.
+## 🚀 Festival Activation
+1. **Initialize Cluster**: Ensure all RPi nodes are on the Reflex mesh subnet with RT-Kernels active.
 2. **Launch NPU Bridge**: Instruct the Neural Co-Producer to "Calibrate PCIe Lanes" for optimal bus speed.
-3. **Perform**: Start the sequencer and use **Neural Directives** to evolve your sound.
+3. **Perform**: Start the sequencer and use **Neural Directives** to evolve your sound live.
 
 ---
 
-## 📄 License
-MIT © 2025 LyraFlex Performance Labs. Official Project of the Kilele 2026 Developer Initiative. Supported by the Infinity Collaborations Student Developer Hub.
+## 📄 Credits
+Built by **Infinity Collaborations** for the **Kilele Festival 2026**.
+In partnership with **Minima** and **Reflex**.
+MIT © 2025 Reflex Performance Labs. Official Project of the Kilele 2026 Developer Initiative.

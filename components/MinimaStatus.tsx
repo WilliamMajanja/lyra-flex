@@ -71,7 +71,7 @@ const MinimaStatus: React.FC<Props> = ({ status, onVerify, isVerified }) => {
       <div className="mt-4 pt-4 border-t border-white/5 space-y-4">
         <div className="flex justify-between items-center text-[10px] font-mono">
           <span className="text-gray-500 uppercase">Contract ID</span>
-          <span className="text-gray-300 truncate ml-4 max-w-[140px] font-mono">TRINITY_AUTH_V4</span>
+          <span className="text-gray-300 truncate ml-4 max-w-[140px] font-mono">REFLEX_AUTH_V4</span>
         </div>
 
         <AnimatePresence mode="wait">
@@ -93,7 +93,7 @@ const MinimaStatus: React.FC<Props> = ({ status, onVerify, isVerified }) => {
               ) : (
                 <>
                   <LockIcon className="w-3 h-3 text-amber-400 group-hover:scale-110 transition-transform" />
-                  <span className="text-[10px] font-black text-amber-200 uppercase tracking-widest">Run Trinity Auth Contract</span>
+                  <span className="text-[10px] font-black text-amber-200 uppercase tracking-widest">Run Reflex Auth Contract</span>
                 </>
               )}
             </motion.button>
@@ -107,7 +107,7 @@ const MinimaStatus: React.FC<Props> = ({ status, onVerify, isVerified }) => {
               <Unlock className="w-4 h-4 text-emerald-400" />
               <div className="flex flex-col">
                 <span className="text-[10px] font-black text-emerald-200 uppercase tracking-widest">License Secured</span>
-                <span className="text-[8px] font-mono text-emerald-500/70 uppercase">Nebula Engine: Unlocked</span>
+                <span className="text-[8px] font-mono text-emerald-500/70 uppercase">Reflex Engine: Unlocked</span>
               </div>
               <div className="ml-auto flex gap-0.5">
                 {[1, 2, 3].map(i => (

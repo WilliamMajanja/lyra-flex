@@ -125,7 +125,7 @@ const App: React.FC = () => {
             <h1 className="text-xl font-black uppercase tracking-[0.25em] text-white">
               LyraFlex <span className="text-emerald-400">PRO</span>
             </h1>
-            <span className="text-[9px] font-mono uppercase tracking-[0.5em] text-gray-700 mt-1">RT-Kernel Mesh // v0.4.2</span>
+            <span className="text-[9px] font-mono uppercase tracking-[0.5em] text-gray-700 mt-1">Reflex RT-Kernel // Kilele 2026</span>
           </div>
 
           <div className="flex items-center gap-12">
@@ -212,7 +212,7 @@ const App: React.FC = () => {
                  </div>
                  <div>
                     <h3 className="text-sm font-black uppercase tracking-[0.25em] text-white">Neural Co-Producer</h3>
-                    <p className="text-[10px] font-mono text-gray-700 uppercase mt-1 font-bold tracking-widest">GEMINI_3_PRO_NATIVE</p>
+                    <p className="text-[10px] font-mono text-gray-700 uppercase mt-1 font-bold tracking-widest">GEMINI_3_PRO_REFLEX</p>
                  </div>
               </div>
             </div>
@@ -224,7 +224,7 @@ const App: React.FC = () => {
                       <Sparkles className="w-16 h-16 text-emerald-500" />
                    </div>
                    <p className="text-[11px] font-mono uppercase tracking-[0.4em] leading-relaxed text-gray-500">
-                     Bridge online. I am monitoring your sequencer state and telemetry cluster. Ask for a mix review or hardware optimization.
+                     Bridge online. I am monitoring your sequencer state and telemetry cluster. Installation by Infinity Collaborations for Kilele 2026.
                    </p>
                 </div>
               )}
@@ -264,7 +264,7 @@ const App: React.FC = () => {
               </form>
               <div className="flex justify-between items-center mt-6 text-[8px] font-mono uppercase text-gray-800 tracking-[0.3em] font-black">
                  <span>Inference Ready</span>
-                 <span>Kilele 2026</span>
+                 <span>Reflex x Minima // Kilele 2026</span>
               </div>
             </div>
           </div>

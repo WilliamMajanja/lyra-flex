@@ -1,6 +1,6 @@
 {
-  "name": "LyraFlex - AI-Powered Music Performance Suite",
-  "description": "Professional performance workstation for artists. Decentralized neural-audio cluster with integrated Mixxx orchestration, FM broadcast, and automated content monetization.",
+  "name": "LyraFlex - Reflex Powered Workstation",
+  "description": "Professional performance workstation built on Reflex with blockchain powered by Minima. An installation for the Kilele Festival 2026 by Infinity Collaborations.",
   "requestFramePermissions": [
     "microphone"
   ]
