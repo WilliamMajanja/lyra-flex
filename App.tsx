@@ -1,12 +1,12 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Music, Radio, Signal, Sparkles, Brain, Cpu, Activity, 
   Database, ShieldCheck, Zap, LayoutGrid, Layers, Loader2,
-  ChevronRight, ChevronLeft, BarChart3, Command
+  ChevronRight, ChevronLeft, BarChart3, Command, Volume2, HardDrive, Terminal as TerminalIcon
 } from 'lucide-react';
-import { NodeType, NodeTelemetry, MinimaNodeStatus, SequencerState } from './types';
+import { NodeType, NodeTelemetry, MinimaNodeStatus, SequencerState, DrumTrack } from './types';
 import TelemetryNode from './components/TelemetryNode';
 import DeploymentTerminal from './components/DeploymentTerminal';
 import MinimaStatus from './components/MinimaStatus';
@@ -19,15 +19,15 @@ import { INITIAL_DRUM_TRACKS } from './constants';
 
 const App: React.FC = () => {
   const [isNebulaAuthenticated, setIsNebulaAuthenticated] = useState(false);
-  const [fmFrequency, setFmFrequency] = useState(101.1);
-  const [isBroadcasting, setIsBroadcasting] = useState(false);
-  const [pcieGen, setPcieGen] = useState(3);
   const [prompt, setPrompt] = useState('');
   const [chatHistory, setChatHistory] = useState<{ role: 'user' | 'assistant', text: string }[]>([]);
   const [isQuerying, setIsQuerying] = useState(false);
   const [activeView, setActiveView] = useState<'sequencer' | 'infrastructure'>('sequencer');
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
   const [isChatExpanded, setIsChatExpanded] = useState(true);
+  const [pcieGen, setPcieGen] = useState(3);
+  // Add missing isBroadcasting state
+  const [isBroadcasting, setIsBroadcasting] = useState(false);
   
   const [sequencerState, setSequencerState] = useState<SequencerState>({
     isPlaying: false,
@@ -52,6 +52,9 @@ const App: React.FC = () => {
   });
 
   useEffect(() => {
+    // Synchronize broadcasting state with sequencer playback
+    setIsBroadcasting(sequencerState.isPlaying);
+
     const interval = setInterval(() => {
       setNodes(prev => prev.map(node => ({
         ...node,
@@ -69,6 +72,33 @@ const App: React.FC = () => {
 
   useEffect(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), [chatHistory]);
 
+  const processDirectives = useCallback((calls: any[]) => {
+    setSequencerState(prev => {
+      const newState = JSON.parse(JSON.stringify(prev)); // Deep clone
+      calls.forEach(call => {
+        if (call.name === 'updateSequencer') {
+          if (call.args.bpm) newState.bpm = Math.max(40, Math.min(300, call.args.bpm));
+        } else if (call.name === 'adjustTrack') {
+          const { trackId, volume, mute, solo, action } = call.args;
+          newState.tracks = newState.tracks.map((t: DrumTrack) => {
+            if (t.id === trackId) {
+              if (volume !== undefined) t.volume = volume;
+              if (mute !== undefined) t.mute = mute;
+              if (solo !== undefined) t.solo = solo;
+              if (action === 'randomize') {
+                t.steps = t.steps.map(() => Math.random() > 0.75);
+              } else if (action === 'clear') {
+                t.steps = t.steps.fill(false);
+              }
+            }
+            return t;
+          });
+        }
+      });
+      return newState;
+    });
+  }, []);
+
   const handleQuery = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!prompt.trim() || isQuerying) return;
@@ -76,8 +106,14 @@ const App: React.FC = () => {
     setPrompt('');
     setChatHistory(prev => [...prev, { role: 'user', text: userMsg }]);
     setIsQuerying(true);
-    const response = await askArchitect(userMsg, sequencerState);
-    setChatHistory(prev => [...prev, { role: 'assistant', text: response }]);
+    
+    const result = await askArchitect(userMsg, sequencerState);
+    
+    if (result.functionCalls && result.functionCalls.length > 0) {
+      processDirectives(result.functionCalls);
+    }
+    
+    setChatHistory(prev => [...prev, { role: 'assistant', text: result.text }]);
     setIsQuerying(false);
   };
 
@@ -86,62 +122,41 @@ const App: React.FC = () => {
       <div className="scanline" />
       <KeyboardShortcuts isOpen={isShortcutsOpen} onClose={() => setIsShortcutsOpen(false)} />
 
-      {/* 1. Global Navigation Rail */}
       <aside className="w-20 shrink-0 flex flex-col items-center py-8 gap-10 bg-black border-r border-white/5 z-50">
         <div className="p-3 bg-emerald-500 rounded-2xl shadow-lg cursor-pointer hover:scale-105 transition-all">
           <Music className="text-black w-6 h-6" />
         </div>
-        
         <nav className="flex flex-col gap-6">
-          <button 
-            onClick={() => setActiveView('sequencer')}
-            className={`p-4 rounded-2xl transition-all ${activeView === 'sequencer' ? 'bg-white/10 text-emerald-400 shadow-xl border border-emerald-500/20' : 'text-gray-700 hover:text-white hover:bg-white/5'}`}
-          >
-            <LayoutGrid className="w-6 h-6" />
-          </button>
-          
-          <button 
-            onClick={() => setActiveView('infrastructure')}
-            className={`p-4 rounded-2xl transition-all ${activeView === 'infrastructure' ? 'bg-white/10 text-cyan-400 shadow-xl border border-cyan-500/20' : 'text-gray-700 hover:text-white hover:bg-white/5'}`}
-          >
-            <Layers className="w-6 h-6" />
-          </button>
+          <button onClick={() => setActiveView('sequencer')} className={`p-4 rounded-2xl transition-all ${activeView === 'sequencer' ? 'bg-white/10 text-emerald-400 border border-emerald-500/20 shadow-xl' : 'text-gray-700 hover:text-white hover:bg-white/5'}`}><LayoutGrid className="w-6 h-6" /></button>
+          <button onClick={() => setActiveView('infrastructure')} className={`p-4 rounded-2xl transition-all ${activeView === 'infrastructure' ? 'bg-white/10 text-cyan-400 border border-cyan-500/20 shadow-xl' : 'text-gray-700 hover:text-white hover:bg-white/5'}`}><Layers className="w-6 h-6" /></button>
         </nav>
-
         <div className="mt-auto flex flex-col gap-6">
-          <button onClick={() => setIsShortcutsOpen(true)} className="p-4 rounded-2xl text-gray-800 hover:text-white">
-            <Command className="w-6 h-6" />
-          </button>
-          <div className={`p-4 rounded-2xl border transition-all ${isBroadcasting ? 'text-red-500 border-red-500/30 bg-red-500/5 shadow-inner' : 'text-gray-800 border-transparent'}`}>
-            <Signal className={`w-6 h-6 ${isBroadcasting ? 'animate-pulse' : ''}`} />
-          </div>
+          <button onClick={() => setIsShortcutsOpen(true)} className="p-4 rounded-2xl text-gray-800 hover:text-white"><Command className="w-6 h-6" /></button>
+          <div className={`p-4 rounded-2xl border transition-all ${isBroadcasting ? 'text-red-500 border-red-500/30 bg-red-500/5' : 'text-gray-800 border-transparent'}`}><Signal className={`w-6 h-6 ${isBroadcasting ? 'animate-pulse' : ''}`} /></div>
         </div>
       </aside>
 
-      {/* 2. Main Workspace */}
       <main className="flex-grow flex flex-col min-w-0 overflow-hidden relative">
         <header className="h-20 shrink-0 flex items-center justify-between px-10 border-b border-white/5 bg-black/40 backdrop-blur-3xl">
           <div className="flex flex-col">
-            <h1 className="text-xl font-black uppercase tracking-[0.25em] text-white">
-              LyraFlex <span className="text-emerald-400">PRO</span>
-            </h1>
-            <span className="text-[9px] font-mono uppercase tracking-[0.5em] text-gray-700 mt-1">Reflex RT-Kernel // Kilele 2026</span>
+            <h1 className="text-xl font-black uppercase tracking-[0.25em] text-white">LyraFlex <span className="text-emerald-400">PRO</span></h1>
+            <span className="text-[9px] font-mono uppercase tracking-[0.5em] text-gray-700 mt-1">Reflex x Infinity // Kilele 2026</span>
           </div>
-
           <div className="flex items-center gap-12">
-            <div className="flex items-center gap-4 bg-black/60 px-5 py-2.5 rounded-2xl border border-white/10 shadow-inner">
+            <div className="flex items-center gap-4 bg-black/60 px-5 py-2.5 rounded-2xl border border-white/10">
               <Database className="w-4 h-4 text-emerald-400" />
               <span className="text-[11px] font-black font-mono text-white tracking-widest uppercase">#{minima.blockHeight}</span>
             </div>
-            
             <div className="hidden lg:flex items-center gap-8 text-[10px] font-mono text-gray-600 uppercase tracking-widest font-black">
                <div className="flex items-center gap-3">
-                  <div className={`w-1.5 h-1.5 rounded-full ${sequencerState.isPlaying ? 'bg-emerald-500 shadow-lg animate-pulse' : 'bg-gray-800'}`} />
+                  <div className={`w-1.5 h-1.5 rounded-full ${sequencerState.isPlaying ? 'bg-emerald-500 animate-pulse' : 'bg-gray-800'}`} />
                   <span className={sequencerState.isPlaying ? 'text-emerald-500' : ''}>Sync: Active</span>
                </div>
-               <div className="flex items-center gap-2">
-                  <span className="text-gray-800 uppercase font-bold">I/O:</span>
-                  <span className="text-cyan-400 font-black">0.8ms</span>
+               <div className="flex items-center gap-2 group">
+                  <Volume2 className="w-4 h-4 text-gray-600 group-hover:text-white" />
+                  <div className="w-20 h-1 bg-white/5 rounded-full overflow-hidden">
+                     <div className="h-full w-3/4 bg-white/20" />
+                  </div>
                </div>
             </div>
           </div>
@@ -150,11 +165,7 @@ const App: React.FC = () => {
         <div className="flex-grow overflow-y-auto p-10 custom-scrollbar">
           <AnimatePresence mode="wait">
             {activeView === 'sequencer' ? (
-              <motion.div 
-                key="seq" 
-                initial={{ opacity: 0, scale: 0.99 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 1.01 }}
-                className="grid grid-cols-12 gap-10 h-full"
-              >
+              <motion.div key="seq" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="grid grid-cols-12 gap-10 h-full">
                 <div className="col-span-12 xl:col-span-9 space-y-10">
                   <DrumMachine externalState={sequencerState} onStateChange={setSequencerState} />
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-10 pb-10">
@@ -162,25 +173,18 @@ const App: React.FC = () => {
                     <MonetizationPanel onMint={(h) => setChatHistory(prev => [...prev, { role: 'assistant', text: `Registry Success. Session Hash: ${h}` }])} />
                   </div>
                 </div>
-
                 <div className="col-span-12 xl:col-span-3 space-y-10">
                   <div className="glass-panel p-6 rounded-[2.5rem] border border-white/5 space-y-8 shadow-xl">
                     <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-white flex items-center gap-3">
                       <BarChart3 className="w-4 h-4 text-fuchsia-400" /> Cluster Metrics
                     </h3>
-                    <div className="space-y-6">
-                      {nodes.map(node => <TelemetryNode key={node.id} data={node} />)}
-                    </div>
+                    <div className="space-y-6">{nodes.map(node => <TelemetryNode key={node.id} data={node} />)}</div>
                   </div>
                   <MinimaStatus status={minima} isVerified={isNebulaAuthenticated} onVerify={() => setIsNebulaAuthenticated(true)} />
                 </div>
               </motion.div>
             ) : (
-              <motion.div 
-                key="infra"
-                initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
-                className="h-full"
-              >
+              <motion.div key="infra" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="h-full">
                 <DeploymentTerminal />
               </motion.div>
             )}
@@ -188,17 +192,13 @@ const App: React.FC = () => {
         </div>
       </main>
 
-      {/* 3. Neural Command Deck (Right Drawer) */}
-      <aside className={`relative flex flex-col border-l border-white/5 bg-[#050505] transition-all duration-500 ease-in-out shadow-[-20px_0_60px_rgba(0,0,0,0.6)] ${isChatExpanded ? 'w-[480px]' : 'w-16'}`}>
-        <button 
-          onClick={() => setIsChatExpanded(!isChatExpanded)}
-          className="absolute -left-5 top-24 z-50 p-2.5 bg-emerald-500 text-black rounded-full shadow-2xl hover:scale-110 active:scale-95 transition-transform"
-        >
+      <aside className={`relative flex flex-col border-l border-white/5 bg-[#050505] transition-all duration-500 shadow-[-20px_0_60px_rgba(0,0,0,0.6)] ${isChatExpanded ? 'w-[480px]' : 'w-16'}`}>
+        <button onClick={() => setIsChatExpanded(!isChatExpanded)} className="absolute -left-5 top-24 z-50 p-2.5 bg-emerald-500 text-black rounded-full shadow-2xl hover:scale-110">
           {isChatExpanded ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
         </button>
 
         {!isChatExpanded ? (
-          <div className="flex flex-col items-center py-10 gap-12 opacity-20 hover:opacity-100 transition-opacity">
+          <div className="flex flex-col items-center py-10 gap-12 opacity-20 hover:opacity-100 transition-opacity cursor-pointer" onClick={() => setIsChatExpanded(true)}>
              <Brain className="w-6 h-6 text-emerald-500" />
              <div className="h-[1px] w-6 bg-white/10" />
              <span className="[writing-mode:vertical-lr] font-mono text-[10px] font-black uppercase tracking-[0.6em] rotate-180 text-emerald-400">Neural Bridge</span>
@@ -207,12 +207,15 @@ const App: React.FC = () => {
           <div className="flex flex-col h-full overflow-hidden">
             <div className="px-10 py-10 border-b border-white/5 shrink-0 bg-black/20">
               <div className="flex items-center gap-5">
-                 <div className="p-3.5 bg-emerald-500/10 rounded-2xl border border-emerald-500/20 shadow-inner">
+                 <div className="p-3.5 bg-emerald-500/10 rounded-2xl border border-emerald-500/20">
                     <Brain className={`w-7 h-7 text-emerald-400 ${isQuerying ? 'animate-pulse' : ''}`} />
                  </div>
                  <div>
                     <h3 className="text-sm font-black uppercase tracking-[0.25em] text-white">Neural Co-Producer</h3>
-                    <p className="text-[10px] font-mono text-gray-700 uppercase mt-1 font-bold tracking-widest">GEMINI_3_PRO_REFLEX</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <div className="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-ping" />
+                      <p className="text-[10px] font-mono text-cyan-500 uppercase font-bold tracking-widest">AIR_LLM // LLAMA_NATIVE_FX</p>
+                    </div>
                  </div>
               </div>
             </div>
@@ -224,16 +227,12 @@ const App: React.FC = () => {
                       <Sparkles className="w-16 h-16 text-emerald-500" />
                    </div>
                    <p className="text-[11px] font-mono uppercase tracking-[0.4em] leading-relaxed text-gray-500">
-                     Bridge online. I am monitoring your sequencer state and telemetry cluster. Installation by Infinity Collaborations for Kilele 2026.
+                     Bridge online. I am monitoring the Reflex Console. Ask me to "Crank the Kick" or "Give me some spacey hats".
                    </p>
                 </div>
               )}
               {chatHistory.map((msg, i) => (
-                <motion.div 
-                  initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-                  key={i} 
-                  className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                >
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                   <div className={`max-w-[90%] p-6 rounded-[1.8rem] text-[12px] font-mono leading-relaxed shadow-2xl border ${msg.role === 'user' ? 'bg-emerald-500 text-black font-black border-emerald-400' : 'bg-white/[0.03] text-gray-300 border-white/10 backdrop-blur-3xl'}`}>
                     {msg.text.split('\n').map((line, idx) => (
                       <span key={idx} className={line.startsWith('DIRECTIVE:') ? 'text-emerald-400 font-bold block mt-4 border-t border-emerald-500/10 pt-2' : ''}>
@@ -248,22 +247,13 @@ const App: React.FC = () => {
 
             <div className="p-10 bg-[#0a0a0a] border-t border-white/10 shrink-0">
               <form onSubmit={handleQuery} className="relative group">
-                <input 
-                  type="text" 
-                  value={prompt} 
-                  onChange={(e) => setPrompt(e.target.value)} 
-                  placeholder="ASK THE ARCHITECT..." 
-                  className="w-full bg-white/[0.03] border border-white/10 rounded-2xl px-7 py-6 pr-16 text-xs focus:outline-none focus:border-emerald-500/50 text-white font-mono uppercase tracking-widest transition-all" 
-                />
-                <button 
-                  disabled={isQuerying}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 p-3.5 bg-emerald-500 text-black rounded-xl hover:bg-emerald-400 transition-all disabled:opacity-20 shadow-lg active:scale-95"
-                >
-                  {isQuerying ? <Loader2 className="w-5 h-5 animate-spin" /> : <Zap className="w-5 h-5 fill-current" />}
+                <input type="text" value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="NEURAL COMMAND..." className="w-full bg-white/[0.03] border border-white/10 rounded-2xl px-7 py-6 pr-16 text-xs focus:outline-none focus:border-emerald-500/50 text-white font-mono uppercase tracking-widest transition-all" />
+                <button disabled={isQuerying} className="absolute right-4 top-1/2 -translate-y-1/2 p-3.5 bg-emerald-500 text-black rounded-xl hover:bg-emerald-400 transition-all disabled:opacity-20 shadow-lg active:scale-95">
+                  {isQuerying ? <Loader2 className="w-5 h-5 animate-spin" /> : <TerminalIcon className="w-5 h-5" />}
                 </button>
               </form>
               <div className="flex justify-between items-center mt-6 text-[8px] font-mono uppercase text-gray-800 tracking-[0.3em] font-black">
-                 <span>Inference Ready</span>
+                 <span className="flex items-center gap-1"><Cpu className="w-2.5 h-2.5"/> NPU_INFERENCE_ACTIVE</span>
                  <span>Reflex x Minima // Kilele 2026</span>
               </div>
             </div>

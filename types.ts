@@ -52,6 +52,7 @@ export interface DrumTrack {
   color: string;
   npuMod: number;            
   mute: boolean;
+  solo: boolean;
   volume: number;            
   engine: NativeEngine;      
 }
