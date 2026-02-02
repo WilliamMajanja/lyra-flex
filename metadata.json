@@ -1,0 +1,7 @@
+{
+  "name": "LyraFlex - AI-Powered Music Performance Suite",
+  "description": "Professional performance workstation for artists. Decentralized neural-audio cluster with integrated Mixxx orchestration, FM broadcast, and automated content monetization.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}

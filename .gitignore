@@ -1,0 +1,21 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Testing
+coverage/
+
+# Production
+dist/
+build/
+
+# RPi / System specific
+*.hef
+*.log
+xvfb.pid
+.DS_Store
+
+# Credentials
+.env
+ansible_vault_pass
