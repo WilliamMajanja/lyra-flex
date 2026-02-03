@@ -55,4 +55,4 @@ Specifically tuned for the **Kilele Festival 2026** by **Infinity Collaborations
 ## 📄 Credits
 Built by **Infinity Collaborations** for the **Kilele Festival 2026**.
 In partnership with **Minima** and **Reflex**.
-MIT © 2025 Reflex Performance Labs. Official Project of the Kilele 2026 Developer Initiative.
+MIT © 2025 Reflex Performance Labs. Official Installation of the Kilele 2026 Instrument Makers Lab .
