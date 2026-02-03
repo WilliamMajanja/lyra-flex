@@ -3,18 +3,19 @@ import React from 'react';
 import { NodeTelemetry, NodeType } from '../types';
 import { CLUSTER_CONFIG } from '../constants';
 import { LineChart, Line, ResponsiveContainer } from 'recharts';
-import { Wind, Gauge, Cpu, Zap } from 'lucide-react';
+import { Wind, Gauge, Cpu, Zap, Server } from 'lucide-react';
 
 interface Props {
   data: NodeTelemetry;
+  isSingleNode?: boolean;
 }
 
-const TelemetryNode: React.FC<Props> = ({ data }) => {
-  const config = data.type === NodeType.NEBULA ? CLUSTER_CONFIG.nebula 
+const TelemetryNode: React.FC<Props> = ({ data, isSingleNode = false }) => {
+  const config = isSingleNode ? CLUSTER_CONFIG.core : 
+                 data.type === NodeType.NEBULA ? CLUSTER_CONFIG.nebula 
                : data.type === NodeType.PULSE ? CLUSTER_CONFIG.pulse 
                : CLUSTER_CONFIG.brain;
 
-  const sparkData = Array.from({ length: 20 }, (_, i) => ({ val: 30 + Math.random() * 40 }));
 
   return (
     <div className="bg-black/40 p-4 rounded-xl border border-white/5 hover:border-white/10 transition-all group relative overflow-hidden">
@@ -67,7 +68,7 @@ const TelemetryNode: React.FC<Props> = ({ data }) => {
         </div>
       </div>
 
-      {data.type !== NodeType.BRAIN && (
+      {(data.type !== NodeType.BRAIN || isSingleNode) && (
         <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Zap className="w-3 h-3 text-cyan-400" />

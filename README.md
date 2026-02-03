@@ -1,3 +1,4 @@
+
 # LyraFlex | Kilele Festival 2026 🎸🔊
 
 ### The World's First AI-Native Performance Workstation
@@ -27,12 +28,22 @@ Specifically tuned for the **Kilele Festival 2026** by **Infinity Collaborations
 
 ---
 
-## 🏗 Distributed Hardware Layout (Reflex Node-Mesh)
+## 🏗 Hardware Configurations
+
+LyraFlex supports two primary hardware configurations.
+
+### A) Single Node Configuration (Default)
+For maximum accessibility, LyraFlex can run in an integrated mode on a single, powerful Raspberry Pi 5.
+- **FX-Core**: A single RPi 5 handles all roles: synthesis, sequencing, mixing, and transmission. This is the recommended setup for most users and developers.
+
+### B) Distributed 3-Node Cluster
+For maximum performance and hardware separation, the original 3-node mesh provides dedicated resources for each core task.
 | Node | Code | Role | Engine |
 | :--- | :--- | :--- | :--- |
 | **FX-01** | The Nebula | Neural Timbre & Pad Synth | ZynAddSubFX / AirLLM |
 | **FX-02** | The Pulse | Rhythmic Micro-Sequences | LMMS / Mixxx |
 | **FX-03** | The Brain | Master Mixing & FM TX | PipeWire / PiFmRds |
+
 
 ---
 
@@ -55,4 +66,4 @@ Specifically tuned for the **Kilele Festival 2026** by **Infinity Collaborations
 ## 📄 Credits
 Built by **Infinity Collaborations** for the **Kilele Festival 2026**.
 In partnership with **Minima** and **Reflex**.
-MIT © 2025 Reflex Performance Labs. Official Installation of the Kilele 2026 Instrument Makers Lab .
+MIT © 2025 Reflex Performance Labs. Official Project of the Kilele 2026 Developer Initiative.

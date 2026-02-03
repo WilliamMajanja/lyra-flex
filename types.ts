@@ -42,24 +42,35 @@ export interface RecordingState {
   status: 'recording' | 'processing' | 'ready' | 'idle';
 }
 
+export interface Clip {
+  id: string;
+  steps: boolean[];
+  velocities: number[];
+  probabilities: number[];
+  pitches: number[]; // 0-24 range, 12 is C4
+  length: number;
+  timeSignature: { beats: number; subdivision: number };
+}
+
 export interface DrumTrack {
   id: string;
   name: string;
-  steps: boolean[];
-  velocities: number[];      
-  probabilities: number[];   
-  lastStep: number;          
+  clips: Clip[];
+  activeClipIndex: number;
   color: string;
-  npuMod: number;            
+  npuMod: number;
   mute: boolean;
   solo: boolean;
-  volume: number;            
-  engine: NativeEngine;      
+  volume: number;
+  frequency: number; // 0 to 1 (normalized cutoff)
+  engine: NativeEngine;
 }
 
 export interface SequencerState {
   isPlaying: boolean;
   bpm: number;
-  currentSteps: number[]; 
+  rootNote: string;
+  scale: 'Major' | 'Minor';
+  timeSignature: { beats: number; subdivision: number };
   tracks: DrumTrack[];
 }

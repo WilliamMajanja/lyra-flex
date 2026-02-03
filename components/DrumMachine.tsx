@@ -1,369 +1,412 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
-  Play, Pause, Settings2, Layers, BarChart, Percent, Hash, 
-  Trash2, Shuffle, Volume2, VolumeX, Radio, Activity
+  Play, Pause, Trash2, Copy, Plus, Waves, Music, Activity, 
+  Settings2, ChevronDown, Monitor, Keyboard, Sliders
 } from 'lucide-react';
-import { motion } from 'framer-motion';
-import { DrumTrack, SequencerState, MasteringChainState, NativeEngine } from '../types';
-
-// Corrected import name from INITIAL_DR_TRACKS to INITIAL_DRUM_TRACKS based on constants.tsx
-import { INITIAL_DRUM_TRACKS } from '../constants';
+import { motion, AnimatePresence } from 'framer-motion';
+import { DrumTrack, SequencerState, Clip } from '../types';
+import { NOTES, SCALES, TIME_SIGNATURES } from '../constants';
 
 interface Props {
   externalState: SequencerState;
   onStateChange: (state: SequencerState) => void;
 }
 
-const DrumMachine: React.FC<Props> = ({ externalState, onStateChange }) => {
-  const [localSeq, setLocalSeq] = useState<SequencerState>(externalState);
-  const [selectedTrackIdx, setSelectedTrackIdx] = useState(0);
-  const [activeParam, setActiveParam] = useState<'step' | 'velocity' | 'probability' | 'lastStep'>('step');
-  const [visualizerLevel, setVisualizerLevel] = useState(0);
-  
-  const [mastering, setMastering] = useState<MasteringChainState>({
-    limiter: 0.85,
-    saturation: 0.45,
-    width: 0.60,
-    eqHigh: 0.30
-  });
+const DraggableBPM: React.FC<{ value: number, onChange: (newValue: number) => void }> = ({ value, onChange }) => {
+  const handleMouseDown = (e: React.MouseEvent) => {
+    const startY = e.clientY;
+    const startBpm = value;
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const newBpm = Math.round(startBpm - (moveEvent.clientY - startY) * 0.5);
+      onChange(Math.max(40, Math.min(300, newBpm)));
+    };
+    const handleMouseUp = () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  };
+  return <div 
+    onMouseDown={handleMouseDown}
+    className="px-2 lg:px-3 py-1 bg-black/40 rounded-lg border border-white/10 text-sm lg:text-xl font-black font-mono text-emerald-400 focus:outline-none cursor-ns-resize select-none flex items-center gap-1 lg:gap-2 active:bg-black/60 transition-colors"
+  >
+    {value} <span className="text-[7px] lg:text-[10px] text-gray-500 uppercase tracking-tighter">BPM</span>
+  </div>
+}
 
+const DrumMachine: React.FC<Props> = ({ externalState, onStateChange }) => {
+  const [selectedTrackIdx, setSelectedTrackIdx] = useState(0);
+  const [activeEditor, setActiveEditor] = useState<'velocity' | 'probability' | 'pitch'>('velocity');
+  const [currentStep, setCurrentStep] = useState(-1);
+  const [masterVolume, setMasterVolume] = useState(0.8);
+  const [peakLevel, setPeakLevel] = useState(0);
+  const [isPainting, setIsPainting] = useState(false);
+  const [paintMode, setPaintMode] = useState(true);
+  
   const audioCtxRef = useRef<AudioContext | null>(null);
   const masterGainRef = useRef<GainNode | null>(null);
-  const limiterNodeRef = useRef<DynamicsCompressorNode | null>(null);
-  const airEqNodeRef = useRef<BiquadFilterNode | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
   const timerRef = useRef<number | null>(null);
-  const masterMeterRef = useRef<number>(0);
-  const rafRef = useRef<number>(null);
-
-  // Smooth visualizer loop
-  useEffect(() => {
-    const updateVisuals = () => {
-      setVisualizerLevel(masterMeterRef.current);
-      masterMeterRef.current *= 0.85; // Decays over time
-      rafRef.current = requestAnimationFrame(updateVisuals);
-    };
-    rafRef.current = requestAnimationFrame(updateVisuals);
-    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
-  }, []);
-
-  // Sync state from external changes (AI or parent updates)
-  useEffect(() => {
-    setLocalSeq(externalState);
-  }, [externalState]);
+  const animationFrameRef = useRef<number | null>(null);
 
   const initAudio = useCallback(() => {
     if (!audioCtxRef.current) {
       const AudioContextClass = (window.AudioContext || (window as any).webkitAudioContext);
       audioCtxRef.current = new AudioContextClass();
-      
       masterGainRef.current = audioCtxRef.current.createGain();
-      limiterNodeRef.current = audioCtxRef.current.createDynamicsCompressor();
-      airEqNodeRef.current = audioCtxRef.current.createBiquadFilter();
-
-      airEqNodeRef.current.type = 'highshelf';
-      airEqNodeRef.current.frequency.setValueAtTime(10000, audioCtxRef.current.currentTime);
-      
-      limiterNodeRef.current.threshold.setValueAtTime(-1.0, audioCtxRef.current.currentTime);
-      limiterNodeRef.current.knee.setValueAtTime(0, audioCtxRef.current.currentTime);
-      limiterNodeRef.current.ratio.setValueAtTime(20, audioCtxRef.current.currentTime);
-      
-      masterGainRef.current.connect(airEqNodeRef.current);
-      airEqNodeRef.current.connect(limiterNodeRef.current);
-      limiterNodeRef.current.connect(audioCtxRef.current.destination);
+      analyserRef.current = audioCtxRef.current.createAnalyser();
+      analyserRef.current.fftSize = 256;
+      masterGainRef.current.connect(analyserRef.current);
+      analyserRef.current.connect(audioCtxRef.current.destination);
     }
-    if (audioCtxRef.current.state === 'suspended') {
-      audioCtxRef.current.resume();
-    }
+    if (audioCtxRef.current.state === 'suspended') audioCtxRef.current.resume();
   }, []);
 
   useEffect(() => {
-    if (airEqNodeRef.current && limiterNodeRef.current && audioCtxRef.current) {
-      const time = audioCtxRef.current.currentTime;
-      airEqNodeRef.current.gain.setTargetAtTime(mastering.eqHigh * 12, time, 0.1);
-      limiterNodeRef.current.threshold.setTargetAtTime(-20 + (mastering.limiter * 18), time, 0.1);
-    }
-  }, [mastering]);
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      switch(e.code) {
+        case 'Space':
+          e.preventDefault();
+          initAudio();
+          onStateChange({ ...externalState, isPlaying: !externalState.isPlaying });
+          break;
+        case 'ArrowUp':
+          e.preventDefault();
+          onStateChange({ ...externalState, bpm: Math.min(300, externalState.bpm + 1) });
+          break;
+        case 'ArrowDown':
+          e.preventDefault();
+          onStateChange({ ...externalState, bpm: Math.max(40, externalState.bpm - 1) });
+          break;
+        case 'KeyV': setActiveEditor('velocity'); break;
+        case 'KeyP': setActiveEditor('pitch'); break;
+        case 'KeyB': setActiveEditor('probability'); break;
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [externalState, onStateChange, initAudio]);
 
-  const triggerSynth = useCallback((track: DrumTrack, trackIdx: number, stepIdx: number) => {
+  const drawMeter = useCallback(() => {
+    if (analyserRef.current && externalState.isPlaying) {
+      const bufferLength = analyserRef.current.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+      analyserRef.current.getByteTimeDomainData(dataArray);
+      let peak = 0;
+      for (let i = 0; i < bufferLength; i++) {
+        const value = Math.abs(dataArray[i] - 128) / 128;
+        if (value > peak) peak = value;
+      }
+      setPeakLevel(peak);
+    } else {
+      setPeakLevel(p => Math.max(0, p * 0.95));
+    }
+    animationFrameRef.current = requestAnimationFrame(drawMeter);
+  }, [externalState.isPlaying]);
+
+  useEffect(() => {
+    animationFrameRef.current = requestAnimationFrame(drawMeter);
+    return () => { if(animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current) };
+  }, [drawMeter]);
+
+  useEffect(() => {
+    if (masterGainRef.current) {
+      masterGainRef.current.gain.setTargetAtTime(masterVolume, audioCtxRef.current?.currentTime ?? 0, 0.01);
+    }
+  }, [masterVolume]);
+  
+  const midiToFreq = (midi: number) => 440 * Math.pow(2, (midi - 69) / 12);
+
+  const triggerSynth = useCallback((track: DrumTrack, clip: Clip, stepIdx: number) => {
     const ctx = audioCtxRef.current;
     if (!ctx || !masterGainRef.current) return;
+    const soloActive = externalState.tracks.some(t => t.solo && !t.mute);
+    if (track.mute || (soloActive && !track.solo)) return;
 
-    const soloActive = localSeq.tracks.some(t => t.solo);
-    if (track.mute) return;
-    if (soloActive && !track.solo) return;
-
-    const vol = track.velocities[stepIdx] * track.volume;
-    masterMeterRef.current = Math.min(1.0, masterMeterRef.current + vol * 0.4);
-
+    const vol = clip.velocities[stepIdx] * track.volume;
+    const time = ctx.currentTime;
     const voiceGain = ctx.createGain();
-    voiceGain.gain.setValueAtTime(vol * 0.5, ctx.currentTime);
-    voiceGain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.4);
+    voiceGain.gain.setValueAtTime(0, time);
+    voiceGain.gain.linearRampToValueAtTime(vol, time + 0.005);
 
-    if (track.id === 'bd') {
+    const filter = ctx.createBiquadFilter();
+    filter.type = track.id === 'hh' ? 'highpass' : 'lowpass';
+    filter.frequency.setValueAtTime(track.frequency * 18000 + 100, time);
+    filter.Q.setValueAtTime(1.5, time);
+
+    voiceGain.connect(filter);
+    filter.connect(masterGainRef.current);
+
+    if (['bd', 'bs', 'ld', 'tm'].includes(track.id)) {
       const osc = ctx.createOscillator();
-      osc.frequency.setValueAtTime(140, ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(44, ctx.currentTime + 0.12);
-      osc.connect(voiceGain);
-      osc.start(); osc.stop(ctx.currentTime + 0.5);
-    } else if (track.id === 'tm') {
-      const osc = ctx.createOscillator();
-      osc.frequency.setValueAtTime(90 + (trackIdx * 5), ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(60, ctx.currentTime + 0.15);
-      osc.connect(voiceGain);
-      osc.start(); osc.stop(ctx.currentTime + 0.6);
-    } else if (track.id === 'bs') {
-      const osc = ctx.createOscillator();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(55, ctx.currentTime);
-      osc.connect(voiceGain);
-      osc.start(); osc.stop(ctx.currentTime + 0.3);
-    } else if (track.id === 'ld') {
-      const osc = ctx.createOscillator();
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(440, ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(220, ctx.currentTime + 0.2);
-      osc.connect(voiceGain);
-      osc.start(); osc.stop(ctx.currentTime + 0.25);
-    } else if (['sn', 'cp', 'hh', 'oh', 'rs'].includes(track.id)) {
+      const pitch = clip.pitches[stepIdx] + (track.id === 'bd' ? 24 : 36);
+      osc.frequency.setValueAtTime(midiToFreq(pitch), time);
+      if (track.id === 'bd') {
+        osc.frequency.exponentialRampToValueAtTime(midiToFreq(pitch - 12), time + 0.1);
+        voiceGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.3);
+      } else {
+        osc.type = track.id === 'ld' ? 'sawtooth' : 'sine';
+        voiceGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.3);
+      }
+      osc.connect(voiceGain); osc.start(time); osc.stop(time + 0.5);
+    } else {
       const noise = ctx.createBufferSource();
-      const buffer = ctx.createBuffer(1, ctx.sampleRate * 0.2, ctx.sampleRate);
+      const buffer = ctx.createBuffer(1, ctx.sampleRate * 0.1, ctx.sampleRate);
       const data = buffer.getChannelData(0);
       for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
       noise.buffer = buffer;
-      const filter = ctx.createBiquadFilter();
-      
-      if (track.id === 'sn') {
-        filter.type = 'bandpass';
-        filter.frequency.setValueAtTime(1500, ctx.currentTime);
-      } else if (track.id === 'cp') {
-        filter.type = 'bandpass';
-        filter.frequency.setValueAtTime(1000, ctx.currentTime);
-        voiceGain.gain.setValueAtTime(vol * 0.6, ctx.currentTime);
-        voiceGain.gain.setTargetAtTime(0, ctx.currentTime + 0.02, 0.01);
-        voiceGain.gain.setTargetAtTime(vol * 0.4, ctx.currentTime + 0.04, 0.01);
-      } else if (track.id === 'rs') {
-        filter.type = 'highpass';
-        filter.frequency.setValueAtTime(4000, ctx.currentTime);
-      } else {
-        filter.type = 'highpass';
-        filter.frequency.setValueAtTime(track.id === 'hh' ? 8000 : 6000, ctx.currentTime);
-      }
-
-      noise.connect(filter); filter.connect(voiceGain);
-      noise.start();
-    } else {
-      const osc = ctx.createOscillator();
-      osc.type = 'square';
-      osc.frequency.setValueAtTime(330, ctx.currentTime);
-      osc.connect(voiceGain);
-      osc.start(); osc.stop(ctx.currentTime + 0.1);
+      voiceGain.gain.exponentialRampToValueAtTime(0.0001, time + (track.id === 'hh' ? 0.05 : 0.2));
+      noise.connect(voiceGain); noise.start(time); noise.stop(time + 0.2);
     }
-
-    voiceGain.connect(masterGainRef.current);
-  }, [localSeq.tracks]);
+  }, [externalState.tracks]);
 
   const advanceStep = useCallback(() => {
-    setLocalSeq(prev => {
-      const nextSteps = prev.currentSteps.map((s, i) => (s + 1) % prev.tracks[i].lastStep);
-      nextSteps.forEach((step, idx) => {
-        const track = prev.tracks[idx];
-        if (track.steps[step]) {
-          if (Math.random() <= track.probabilities[step]) triggerSynth(track, idx, step);
+    setCurrentStep(prevStep => {
+      const newStep = (prevStep + 1) % 16;
+      externalState.tracks.forEach((track) => {
+        const clip = track.clips[track.activeClipIndex];
+        if (!clip) return;
+        if (clip.steps[newStep] && Math.random() <= clip.probabilities[newStep]) {
+          triggerSynth(track, clip, newStep);
         }
       });
-      return { ...prev, currentSteps: nextSteps };
+      return newStep;
     });
-  }, [triggerSynth]);
+  }, [externalState.tracks, triggerSynth]);
 
   useEffect(() => {
-    if (localSeq.isPlaying) {
-      const stepTime = (60 / localSeq.bpm / 4) * 1000;
+    if (externalState.isPlaying) {
+      if (currentStep === -1) setCurrentStep(0);
+      const stepTime = (60 / externalState.bpm / 4) * 1000;
       timerRef.current = window.setInterval(advanceStep, stepTime);
-    } else if (timerRef.current) {
-      clearInterval(timerRef.current);
+    } else {
+      if (timerRef.current) clearInterval(timerRef.current);
+      setCurrentStep(-1);
     }
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [localSeq.isPlaying, localSeq.bpm, advanceStep]);
+  }, [externalState.isPlaying, externalState.bpm, advanceStep]);
 
-  const toggleStep = (tIdx: number, sIdx: number) => {
-    initAudio();
-    const newTracks = [...localSeq.tracks];
-    newTracks[tIdx] = { ...newTracks[tIdx], steps: [...newTracks[tIdx].steps] };
-    newTracks[tIdx].steps[sIdx] = !newTracks[tIdx].steps[sIdx];
-    const newState = { ...localSeq, tracks: newTracks };
-    setLocalSeq(newState);
-    onStateChange(newState);
+  const updateTrack = (tIdx: number, newProps: Partial<DrumTrack>) => {
+    const newTracks = [...externalState.tracks];
+    newTracks[tIdx] = { ...newTracks[tIdx], ...newProps };
+    onStateChange({ ...externalState, tracks: newTracks });
   };
 
-  const randomizePattern = (tIdx: number) => {
-    const newTracks = [...localSeq.tracks];
-    newTracks[tIdx] = { ...newTracks[tIdx], steps: Array(16).fill(false).map(() => Math.random() > 0.7) };
-    const newState = { ...localSeq, tracks: newTracks };
-    setLocalSeq(newState);
-    onStateChange(newState);
+  const updateClip = (tIdx: number, cIdx: number, newProps: Partial<Clip>) => {
+    const newTracks = [...externalState.tracks];
+    const newClips = [...newTracks[tIdx].clips];
+    newClips[cIdx] = { ...newClips[cIdx], ...newProps };
+    newTracks[tIdx].clips = newClips;
+    onStateChange({ ...externalState, tracks: newTracks });
+  };
+  
+  const handleEditorDrag = (sIdx: number, e: React.MouseEvent | React.TouchEvent) => {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const clientY = 'touches' in e ? (e as React.TouchEvent).touches[0].clientY : (e as React.MouseEvent).clientY;
+    const val = Math.max(0, Math.min(1, 1 - (clientY - rect.top) / rect.height));
+    const activeClip = externalState.tracks[selectedTrackIdx].clips[externalState.tracks[selectedTrackIdx].activeClipIndex];
+    
+    if (activeEditor === 'velocity') {
+      const newVs = [...activeClip.velocities]; newVs[sIdx] = val;
+      updateClip(selectedTrackIdx, externalState.tracks[selectedTrackIdx].activeClipIndex, { velocities: newVs });
+    } else if (activeEditor === 'probability') {
+      const newPs = [...activeClip.probabilities]; newPs[sIdx] = val;
+      updateClip(selectedTrackIdx, externalState.tracks[selectedTrackIdx].activeClipIndex, { probabilities: newPs });
+    } else {
+      const newPitches = [...activeClip.pitches]; newPitches[sIdx] = Math.round(val * 24);
+      updateClip(selectedTrackIdx, externalState.tracks[selectedTrackIdx].activeClipIndex, { pitches: newPitches });
+    }
   };
 
-  const clearPattern = (tIdx: number) => {
-    const newTracks = [...localSeq.tracks];
-    newTracks[tIdx] = { ...newTracks[tIdx], steps: Array(16).fill(false) };
-    const newState = { ...localSeq, tracks: newTracks };
-    setLocalSeq(newState);
-    onStateChange(newState);
-  };
-
-  const toggleMute = (tIdx: number) => {
-    const newTracks = [...localSeq.tracks];
-    newTracks[tIdx] = { ...newTracks[tIdx], mute: !newTracks[tIdx].mute };
-    const newState = { ...localSeq, tracks: newTracks };
-    setLocalSeq(newState);
-    onStateChange(newState);
-  };
-
-  const toggleSolo = (tIdx: number) => {
-    const newTracks = [...localSeq.tracks];
-    newTracks[tIdx] = { ...newTracks[tIdx], solo: !newTracks[tIdx].solo };
-    const newState = { ...localSeq, tracks: newTracks };
-    setLocalSeq(newState);
-    onStateChange(newState);
-  };
+  const selectedTrack = externalState.tracks[selectedTrackIdx];
+  const activeClip = selectedTrack?.clips[selectedTrack.activeClipIndex];
 
   return (
-    <div className="glass-panel p-8 rounded-[2.5rem] border border-white/5 flex flex-col gap-10 h-full relative overflow-hidden shadow-2xl">
-      <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/[0.03] to-transparent pointer-events-none" />
+    <div className="glass-panel p-4 lg:p-8 rounded-2xl lg:rounded-[2.5rem] border border-white/5 flex flex-col gap-4 lg:gap-8 h-full relative overflow-hidden shadow-2xl" onMouseUp={() => setIsPainting(false)} onTouchEnd={() => setIsPainting(false)}>
       
-      <div className="flex justify-between items-center relative z-10">
-        <div className="flex items-center gap-10">
-           <div className="space-y-1">
-              <h2 className="text-2xl font-black text-white uppercase tracking-[0.2em]">Console PRO</h2>
-              <div className="flex items-center gap-4">
-                 <div className={`w-2 h-2 rounded-full ${localSeq.isPlaying ? 'bg-emerald-500 animate-pulse' : 'bg-gray-800'}`} />
-                 <span className="text-[10px] font-mono text-gray-600 uppercase tracking-widest font-black">Reflex Native Engine</span>
-              </div>
+      {/* HEADER SECTION - UPDATED BRANDING */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shrink-0">
+         <div className="flex items-center gap-3 lg:gap-6 w-full md:w-auto justify-between md:justify-start">
+            <h2 className="text-sm lg:text-xl font-black text-white uppercase tracking-[0.2em] flex items-center gap-2">
+              CONSOLE PRO
+              {externalState.isPlaying && (
+                <motion.div 
+                  animate={{ scale: [1, 1.3, 1], opacity: [0.6, 1, 0.6] }} 
+                  transition={{ duration: 0.3, repeat: Infinity }} 
+                  className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.8)]" 
+                />
+              )}
+            </h2>
+            <div className="flex items-center gap-2 lg:gap-4 bg-black/60 p-1.5 rounded-xl border border-white/10 shadow-inner px-3">
+               <button 
+                 onClick={() => { initAudio(); onStateChange({ ...externalState, isPlaying: !externalState.isPlaying }); }} 
+                 className={`p-2.5 lg:p-3 rounded-lg transition-all active:scale-90 ${externalState.isPlaying ? 'bg-emerald-500 text-black shadow-lg shadow-emerald-500/20' : 'bg-white/5 hover:bg-white/10'}`}
+               >
+                  {externalState.isPlaying ? <Pause className="w-4 h-4 lg:w-5 lg:h-5 fill-current" /> : <Play className="w-4 h-4 lg:w-5 lg:h-5 fill-current" />}
+               </button>
+               <DraggableBPM value={externalState.bpm} onChange={bpm => onStateChange({...externalState, bpm})} />
+            </div>
+         </div>
+         
+         <div className="flex items-center gap-4 w-full md:w-auto justify-end">
+           <div className="flex-grow md:flex-grow-0 md:w-48 h-2 bg-black/50 rounded-full overflow-hidden relative border border-white/5 shadow-inner">
+              <motion.div className="absolute top-0 left-0 h-full bg-emerald-500 transition-[width] duration-75" style={{width: `${peakLevel * 100}%`}} />
            </div>
-           
-           <div className="flex items-center gap-2 bg-black/60 p-1.5 rounded-2xl border border-white/10 shadow-inner">
-             <button 
-              onClick={() => { initAudio(); onStateChange({ ...localSeq, isPlaying: !localSeq.isPlaying }); }}
-              className={`p-5 rounded-xl transition-all ${localSeq.isPlaying ? 'bg-emerald-500 text-black shadow-lg scale-105' : 'bg-white/5 text-gray-400 hover:text-white'}`}
-             >
-              {localSeq.isPlaying ? <Pause className="w-6 h-6 fill-current" /> : <Play className="w-6 h-6 fill-current" />}
-             </button>
-             <div className="px-6 flex flex-col items-center">
-                <span className="text-[9px] font-black uppercase text-gray-700 tracking-widest">Global BPM</span>
-                <span className="text-xl font-black text-white font-mono tracking-tighter">{localSeq.bpm}</span>
-             </div>
-           </div>
-        </div>
-
-        <div className="flex items-center gap-2 bg-black/80 p-1.5 rounded-2xl border border-white/10 shadow-2xl">
-           {[
-             { id: 'step', icon: <Layers className="w-4 h-4" />, label: 'Gate' },
-             { id: 'velocity', icon: <BarChart className="w-4 h-4" />, label: 'Velo' },
-             { id: 'probability', icon: <Percent className="w-4 h-4" />, label: 'Prob' },
-           ].map(p => (
-             <button
-               key={p.id}
-               onClick={() => setActiveParam(p.id as any)}
-               className={`px-5 py-3 rounded-xl flex items-center gap-3 transition-all ${activeParam === p.id ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'text-gray-500 hover:text-gray-300'}`}
-             >
-               {p.icon}
-               <span className="text-[10px] font-black uppercase tracking-widest hidden 2xl:inline">{p.label}</span>
-             </button>
-           ))}
-        </div>
+           <input type="range" min={0} max={1} step={0.01} value={masterVolume} onChange={e => setMasterVolume(parseFloat(e.target.value))} className="w-20 lg:w-28 accent-emerald-500 cursor-pointer" />
+         </div>
       </div>
 
-      <div className="flex-grow flex flex-col gap-4 relative z-10 overflow-y-auto custom-scrollbar pr-2">
-        {localSeq.tracks.map((track, tIdx) => (
-          <div key={track.id} className={`flex items-stretch gap-6 transition-all duration-300 ${selectedTrackIdx === tIdx ? 'opacity-100 scale-[1.01]' : 'opacity-20 hover:opacity-40 grayscale'}`}>
-            <div 
-              onClick={() => setSelectedTrackIdx(tIdx)}
-              className={`w-52 shrink-0 flex flex-col gap-3 p-4 rounded-2xl border transition-all cursor-pointer ${selectedTrackIdx === tIdx ? 'bg-white/5 border-white/20 shadow-xl' : 'border-transparent'}`}
-            >
-               <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-white truncate max-w-[100px]">{track.name}</span>
-                  <div className="flex gap-1.5">
-                     <button onClick={() => toggleSolo(tIdx)} className={`text-[8px] font-black px-1.5 py-0.5 rounded ${track.solo ? 'bg-amber-500 text-black' : 'bg-white/5 text-gray-500'}`}>S</button>
-                     <button onClick={() => toggleMute(tIdx)} className={`text-[8px] font-black px-1.5 py-0.5 rounded ${track.mute ? 'bg-red-500 text-black' : 'bg-white/5 text-gray-500'}`}>M</button>
-                  </div>
+      {/* STEP LOOP INDICATOR */}
+      <div className="w-full flex gap-1 lg:gap-1.5 px-2">
+         {Array.from({ length: 16 }).map((_, i) => (
+           <div 
+             key={i} 
+             className={`h-1.5 lg:h-2 flex-grow rounded-full transition-all duration-100 ${
+               currentStep === i ? 'bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.8)] scale-y-125' : 'bg-white/5'
+             }`} 
+           />
+         ))}
+      </div>
+
+      {/* MIDDLE SECTION: TRACKS & GRID */}
+      <div className="flex-grow flex flex-col xl:flex-row gap-6 lg:gap-8 min-h-0">
+         {/* TRACK LIST - ENHANCED TOUCH TARGETS */}
+         <div className="w-full xl:w-80 flex xl:flex-col gap-3 shrink-0 overflow-x-auto xl:overflow-y-auto no-scrollbar pb-3 xl:pb-0">
+            {externalState.tracks.map((track, tIdx) => {
+               const isActive = selectedTrackIdx === tIdx;
+               return (
+                <div key={track.id} className={`flex items-center gap-3 p-2.5 rounded-2xl transition-all relative shrink-0 xl:shrink border ${isActive ? 'bg-white/10 border-white/10 shadow-lg' : 'opacity-50 border-transparent hover:opacity-80'}`}>
+                   <div className="flex flex-col gap-1.5 items-center shrink-0">
+                      <div className={`w-6 h-6 rounded-full border border-white/10 bg-black/40 flex items-center justify-center ${isActive ? `text-${track.color}-400` : 'text-gray-600'}`}>
+                        <Waves className="w-3.5 h-3.5" />
+                      </div>
+                      <div className="flex gap-1">
+                        <button onClick={() => updateTrack(tIdx, { solo: !track.solo })} className={`w-5 h-5 flex items-center justify-center rounded text-[8px] font-black transition-colors ${track.solo ? 'bg-amber-500 text-black shadow-md shadow-amber-500/20' : 'bg-black/50 text-gray-500'}`}>S</button>
+                        <button onClick={() => updateTrack(tIdx, { mute: !track.mute })} className={`w-5 h-5 flex items-center justify-center rounded text-[8px] font-black transition-colors ${track.mute ? 'bg-red-500 text-black shadow-md shadow-red-500/20' : 'bg-black/50 text-gray-500'}`}>M</button>
+                      </div>
+                   </div>
+                   <button onClick={() => setSelectedTrackIdx(tIdx)} className="w-24 lg:w-28 text-left p-2 rounded-xl bg-black/40 border border-transparent hover:border-white/5 flex flex-col gap-1.5 overflow-hidden transition-all active:bg-black/60">
+                      <span className={`text-[9px] lg:text-[11px] font-black uppercase tracking-widest text-${track.color}-400 truncate`}>{track.name}</span>
+                      <div className="h-1 bg-white/5 w-full rounded-full overflow-hidden shadow-inner"><div className={`h-full bg-${track.color}-500 transition-all`} style={{width: `${track.volume * 100}%`}} /></div>
+                   </button>
+                   <div className="flex gap-1.5 shrink-0">
+                      {track.clips.slice(0, 2).map((clip, cIdx) => (
+                         <button 
+                          key={clip.id} 
+                          onClick={() => updateTrack(tIdx, { activeClipIndex: cIdx })} 
+                          className={`w-8 h-8 lg:w-10 lg:h-10 rounded-xl transition-all border font-black text-[10px] active:scale-95 ${track.activeClipIndex === cIdx ? `bg-${track.color}-500 border-${track.color}-400 text-black shadow-lg` : 'bg-white/5 border-transparent text-gray-600 hover:text-white'}`}
+                        >
+                            {cIdx + 1}
+                         </button>
+                      ))}
+                   </div>
+                </div>
+               );
+            })}
+         </div>
+
+         {/* MAIN SEQUENCER GRID - SWIPE SCROLL OPTIMIZED */}
+         {activeClip && (
+            <div className="flex-grow bg-black/60 rounded-[2rem] p-4 lg:p-6 border border-white/5 overflow-hidden relative flex flex-col shadow-2xl">
+               <div className="flex items-center justify-between mb-4 px-2">
+                 <div className="flex flex-col">
+                    <span className="text-[10px] font-black uppercase text-gray-500 tracking-widest">Active Sequence</span>
+                    <span className="text-[8px] font-mono text-emerald-500/60 uppercase">Step-Locked Loop // 16 Gates</span>
+                 </div>
+                 <div className="flex items-center gap-3 lg:hidden">
+                    <span className="text-[8px] font-mono text-cyan-500 animate-pulse uppercase tracking-widest">Swipe Grid</span>
+                 </div>
                </div>
                
-               <div className="flex gap-2">
-                  <div className="h-10 flex-grow bg-black rounded-xl relative overflow-hidden shadow-inner flex flex-col items-center justify-center">
-                    <motion.div animate={{ height: `${track.volume * 100}%` }} className={`absolute bottom-0 left-0 w-full bg-gradient-to-t from-${track.color}-600/30 to-${track.color}-400/10`} />
-                    <span className="text-[10px] font-black text-white relative z-10 font-mono">{(track.volume * 100).toFixed(0)}</span>
-                    <input type="range" min="0" max="1" step="0.01" value={track.volume} 
-                      onChange={(e) => {
-                        const newTracks = [...localSeq.tracks];
-                        newTracks[tIdx].volume = parseFloat(e.target.value);
-                        onStateChange({ ...localSeq, tracks: newTracks });
-                      }}
-                      className="absolute inset-0 opacity-0 cursor-pointer" 
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                     <button onClick={() => randomizePattern(tIdx)} className="p-1 bg-white/5 rounded hover:bg-white/10 text-gray-500 hover:text-white"><Shuffle className="w-3 h-3"/></button>
-                     <button onClick={() => clearPattern(tIdx)} className="p-1 bg-white/5 rounded hover:bg-white/10 text-gray-500 hover:text-white"><Trash2 className="w-3 h-3"/></button>
-                  </div>
+               <div className="flex-grow overflow-x-auto no-scrollbar touch-pan-x cursor-crosshair">
+                 <div className="grid grid-cols-16 gap-2 lg:gap-3 min-w-[760px] lg:min-w-0 h-full pb-2">
+                   {Array.from({ length: 16 }).map((_, sIdx) => {
+                      const isBeatStart = sIdx % 4 === 0;
+                      return (
+                        <button 
+                          key={sIdx} 
+                          onMouseDown={() => { 
+                            const targetState = !activeClip.steps[sIdx];
+                            setPaintMode(targetState);
+                            setIsPainting(true);
+                            const newSteps = [...activeClip.steps]; newSteps[sIdx] = targetState; 
+                            updateClip(selectedTrackIdx, selectedTrack.activeClipIndex, { steps: newSteps });
+                          }} 
+                          onMouseEnter={() => {
+                            if (isPainting && activeClip.steps[sIdx] !== paintMode) {
+                              const newSteps = [...activeClip.steps]; newSteps[sIdx] = paintMode;
+                              updateClip(selectedTrackIdx, selectedTrack.activeClipIndex, { steps: newSteps });
+                            }
+                          }}
+                          className={`rounded-xl lg:rounded-2xl relative transition-all duration-75 transform active:scale-90 ${
+                            activeClip.steps[sIdx] ? `bg-${selectedTrack.color}-500 shadow-lg shadow-${selectedTrack.color}-500/20` : 'bg-white/[0.04] hover:bg-white/[0.08]'
+                          } ${currentStep === sIdx ? 'ring-2 ring-white scale-105 z-10 shadow-[0_0_15px_rgba(255,255,255,0.3)]' : ''} ${isBeatStart ? 'border-l-2 border-white/20' : ''}`} 
+                        />
+                      );
+                   })}
+                 </div>
+               </div>
+            </div>
+         )}
+      </div>
+
+      {/* PARAMETER EDITOR - FULL USABILITY ON MOBILE */}
+      {activeClip && (
+         <div className="h-52 lg:h-64 shrink-0 bg-black/50 rounded-[2rem] border border-white/5 p-4 lg:p-6 flex flex-col gap-4 shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between px-2 shrink-0">
+               <div className="flex bg-black/80 p-1 rounded-xl border border-white/10 shadow-inner">
+                 {['velocity', 'probability', 'pitch'].map(editor => (
+                    <button 
+                      key={editor} 
+                      onClick={() => setActiveEditor(editor as any)} 
+                      className={`px-4 lg:px-6 py-1.5 lg:py-2 text-[9px] lg:text-[11px] uppercase font-black rounded-lg transition-all active:scale-95 ${activeEditor === editor ? `bg-${selectedTrack.color}-500 text-black shadow-lg` : 'text-gray-500 hover:text-white'}`}
+                    >
+                      {editor}
+                    </button>
+                 ))}
+               </div>
+               <div className="flex items-center gap-3">
+                 <button onClick={() => { if(selectedTrack.clips.length < 4) {const newClip = JSON.parse(JSON.stringify(activeClip)); newClip.id = `clip_${Math.random()}`; updateTrack(selectedTrackIdx, { clips: [...selectedTrack.clips, newClip]})}}} className="p-2.5 hover:bg-white/5 rounded-xl text-gray-500 hover:text-emerald-400 transition-all active:scale-90"><Copy className="w-4 h-4" /></button>
+                 <button onClick={() => { if(selectedTrack.clips.length > 1) { const newClips = selectedTrack.clips.filter((_,i) => i !== selectedTrack.activeClipIndex); updateTrack(selectedTrackIdx, { clips: newClips, activeClipIndex: 0 })}}} className="p-2.5 hover:bg-white/5 rounded-xl text-gray-500 hover:text-red-400 transition-all active:scale-90"><Trash2 className="w-4 h-4" /></button>
                </div>
             </div>
 
-            <div className="flex-grow grid grid-cols-16 gap-3">
-              {Array.from({ length: 16 }).map((_, sIdx) => (
-                <button
-                  key={sIdx}
-                  onClick={() => toggleStep(tIdx, sIdx)}
-                  className={`h-full rounded-2xl border transition-all relative overflow-hidden shadow-lg ${
-                    localSeq.currentSteps[tIdx] === sIdx ? 'ring-2 ring-white/60 z-20 scale-[1.04]' : 'border-white/5'
-                  } ${
-                    sIdx >= track.lastStep ? 'opacity-0 pointer-events-none' : 
-                    track.steps[sIdx] ? `bg-gradient-to-br from-${track.color}-700 to-${track.color}-400 border-white/20` : 'bg-black/80 hover:bg-white/10'
-                  }`}
-                >
-                  {localSeq.currentSteps[tIdx] === sIdx && <div className="absolute inset-0 bg-white/10 pointer-events-none animate-pulse" />}
-                  {sIdx % 4 === 0 && !track.steps[sIdx] && localSeq.currentSteps[tIdx] !== sIdx && <div className="absolute inset-0 bg-white/[0.02] pointer-events-none" />}
-                </button>
-              ))}
+            <div className="flex-grow overflow-x-auto no-scrollbar touch-pan-x pt-2">
+              <div className="grid grid-cols-16 gap-1.5 relative h-full min-w-[760px] lg:min-w-0">
+                 {Array.from({length: 16}).map((_, sIdx) => {
+                    let value, display;
+                    if (activeEditor === 'velocity') { value = activeClip.velocities[sIdx]; display = `${Math.round(value * 100)}%`; }
+                    else if (activeEditor === 'probability') { value = activeClip.probabilities[sIdx]; display = `${Math.round(value * 100)}%`; }
+                    else { 
+                      value = activeClip.pitches[sIdx] / 24; 
+                      display = `${NOTES[activeClip.pitches[sIdx] % 12]}${Math.floor(activeClip.pitches[sIdx]/12)+2}`;
+                    }
+                    return (
+                       <div 
+                        key={sIdx} 
+                        className={`w-full h-full bg-white/[0.03] rounded-xl overflow-hidden relative group cursor-ns-resize transition-colors hover:bg-white/[0.06] ${currentStep === sIdx ? 'ring-1 ring-white/20' : ''}`} 
+                        onMouseDown={(e) => {setIsPainting(true); handleEditorDrag(sIdx, e);}} 
+                        onMouseEnter={(e) => {if(isPainting) handleEditorDrag(sIdx, e)}}
+                        onTouchMove={(e) => { if(isPainting) handleEditorDrag(sIdx, e); e.preventDefault(); }} 
+                        onTouchStart={() => setIsPainting(true)}
+                       >
+                          {activeClip.steps[sIdx] && (
+                            <motion.div 
+                              style={{ height: `${value * 100}%` }} 
+                              className={`w-full absolute bottom-0 bg-${selectedTrack.color}-500/60 pointer-events-none rounded-t-lg shadow-[0_0_15px_rgba(var(--tw-shadow-color),0.3)]`} 
+                            />
+                          )}
+                          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity text-[8px] font-mono text-white/50 font-black">{display}</div>
+                       </div>
+                    );
+                 })}
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
-
-      <div className="mt-auto p-8 bg-black/80 rounded-[2.5rem] border border-white/10 flex items-center justify-between gap-12 shadow-2xl relative z-10">
-        <div className="flex gap-10 items-center">
-           {[
-             { id: 'limiter', label: 'Pro Ceiling', val: mastering.limiter, color: 'emerald' },
-             { id: 'saturation', label: 'Valve Drive', val: mastering.saturation, color: 'amber' },
-             { id: 'width', label: 'Stereo Imager', val: mastering.width, color: 'cyan' },
-           ].map(item => (
-             <div key={item.id} className="flex flex-col gap-3">
-                <span className="text-[9px] font-black uppercase text-gray-700 tracking-widest">{item.label}</span>
-                <div className="w-32 h-1.5 bg-black rounded-full overflow-hidden relative shadow-inner">
-                   <motion.div animate={{ width: `${item.val * 100}%` }} className={`h-full bg-${item.color}-500`} />
-                   <input 
-                     type="range" min="0" max="1" step="0.01" value={item.val} 
-                     onChange={(e) => setMastering({...mastering, [item.id as keyof MasteringChainState]: parseFloat(e.target.value)})}
-                     className="absolute inset-0 opacity-0 cursor-pointer" 
-                   />
-                </div>
-             </div>
-           ))}
-        </div>
-
-        <div className="flex items-end gap-1.5 h-12 w-64 bg-black/40 rounded-2xl p-4 border border-white/5 relative group overflow-hidden shadow-inner">
-           {[...Array(32)].map((_, i) => (
-             <motion.div 
-               key={i} 
-               animate={{ 
-                 height: localSeq.isPlaying ? [4, (Math.random() * 20 + 5) * visualizerLevel, 4] : 4 
-               }}
-               transition={{ duration: 0.1, repeat: Infinity, delay: i * 0.01 }}
-               className={`w-1 rounded-full ${i > 24 ? 'bg-red-500/60' : i > 18 ? 'bg-amber-500/60' : 'bg-emerald-500/40'}`} 
-             />
-           ))}
-        </div>
-      </div>
+         </div>
+      )}
     </div>
   );
 };

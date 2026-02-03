@@ -16,25 +16,25 @@ const KeyboardShortcuts: React.FC<Props> = ({ isOpen, onClose }) => {
       title: "Transport",
       items: [
         { key: "SPACE", action: "Toggle Play/Pause" },
-        { key: "BACKSPACE", action: "Stop & Reset to 0" },
-        { key: "[ / ]", action: "BPM Increment +/-" },
+        { key: "UP/DOWN", action: "Adjust BPM" },
+      ]
+    },
+    {
+      title: "Clip & Track",
+      items: [
+        { key: "ARROW KEYS", action: "Navigate Tracks & Clips" },
+        { key: "ENTER", action: "Launch Selected Clip" },
+        { key: "CMD+D", action: "Duplicate Clip" },
+        { key: "BACKSPACE", action: "Delete Clip" },
       ]
     },
     {
       title: "Sequencing",
       items: [
-        { key: "MOUSE CLICK", action: "Toggle Step" },
-        { key: "RIGHT CLICK", action: "Set Polymetric End" },
-        { key: "SCROLL WHEEL", action: "Adjust Velo/Prob" },
-        { key: "1 - 5", action: "Select Track 1-5" },
-      ]
-    },
-    {
-      title: "Performance",
-      items: [
-        { key: "M", action: "Mute Selected Track" },
-        { key: "?", action: "Toggle This Manual" },
-        { key: "SHIFT+1-4", action: "Pattern Snapshots" },
+        { key: "MOUSE CLICK", action: "Toggle Step Note" },
+        { key: "V", action: "Velocity Editor" },
+        { key: "P", action: "Pitch Editor" },
+        { key: "B", action: "Probability Editor" },
       ]
     }
   ];
@@ -49,7 +49,7 @@ const KeyboardShortcuts: React.FC<Props> = ({ isOpen, onClose }) => {
         <div className="px-6 py-4 bg-emerald-500/10 border-b border-emerald-500/20 flex justify-between items-center">
           <div className="flex items-center gap-3">
             <Command className="w-5 h-5 text-emerald-400" />
-            <h2 className="text-xs font-black uppercase tracking-[0.3em] text-white">Tactical Command Manual // FX-v4</h2>
+            <h2 className="text-xs font-black uppercase tracking-[0.3em] text-gray-200">Tactical Command Manual // FX-v5</h2>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-full transition-colors">
             <X className="w-5 h-5 text-gray-500" />

@@ -93,7 +93,7 @@ const MonetizationPanel: React.FC<Props> = ({ onMint }) => {
           {recording.status === 'idle' && (
             <motion.div key="idle" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center gap-4 text-center">
               <div className="p-4 rounded-full bg-white/5 border border-white/10 group-hover:scale-110 transition-transform">
-                <Music className="w-10 h-10 text-gray-700" />
+                <Music className="w-10 h-10 text-gray-500" />
               </div>
               <p className="text-[10px] text-gray-500 font-mono uppercase tracking-widest max-w-[200px]">System Awaiting Performance Input</p>
             </motion.div>

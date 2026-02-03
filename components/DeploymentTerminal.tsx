@@ -88,7 +88,7 @@ protocol.native.tcp = {
           </button>
         ))}
       </div>
-      <div className="p-10 flex-grow overflow-auto bg-[#050505] custom-scrollbar">
+      <div className="p-10 flex-grow overflow-auto bg-[#010409] custom-scrollbar">
         <div className="flex items-center gap-4 mb-4">
           <Terminal className="w-5 h-5 text-cyan-500" />
           <h4 className="text-sm font-black text-white uppercase tracking-[0.2em]">{content[activeTab].title}</h4>

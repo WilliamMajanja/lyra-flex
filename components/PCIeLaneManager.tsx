@@ -40,7 +40,7 @@ const PCIeLaneManager: React.FC<Props> = ({ currentGen, onGenChange }) => {
            </div>
            <div>
               <h3 className="text-sm font-black uppercase tracking-[0.2em] text-white">Hardware Bridge</h3>
-              <p className="text-[10px] font-mono text-gray-600 uppercase mt-1 tracking-widest font-bold">PCIe Native Interface</p>
+              <p className="text-[10px] font-mono text-gray-500 uppercase mt-1 tracking-widest font-bold">PCIe Native Interface</p>
            </div>
         </div>
         <div className="flex gap-2 p-1.5 bg-black/60 rounded-xl border border-white/10 shadow-inner">
@@ -61,7 +61,7 @@ const PCIeLaneManager: React.FC<Props> = ({ currentGen, onGenChange }) => {
       <div className="relative h-28 bg-black/80 rounded-[1.8rem] border border-white/5 flex items-center justify-between px-10 overflow-hidden shadow-2xl">
         <div className="flex flex-col items-center gap-2 relative z-10">
            <Cpu className="w-6 h-6 text-gray-500" />
-           <span className="text-[8px] font-mono text-gray-700 uppercase tracking-widest font-black">BCM2712 Host</span>
+           <span className="text-[8px] font-mono text-gray-500 uppercase tracking-widest font-black">BCM2712 Host</span>
         </div>
 
         <div className="flex-grow flex items-center justify-center px-10">
@@ -85,7 +85,7 @@ const PCIeLaneManager: React.FC<Props> = ({ currentGen, onGenChange }) => {
 
       <div className="grid grid-cols-2 gap-6">
          <div className="p-6 bg-black/40 rounded-[1.5rem] border border-white/5 space-y-2 group shadow-inner">
-            <span className="text-[9px] font-black uppercase text-gray-700 tracking-[0.2em] group-hover:text-cyan-400 transition-colors">Bus Latency</span>
+            <span className="text-[9px] font-black uppercase text-gray-500 tracking-[0.2em] group-hover:text-cyan-400 transition-colors">Bus Latency</span>
             <div className="flex items-baseline gap-2">
                <motion.span 
                  key={latency.toFixed(2)}
@@ -98,7 +98,7 @@ const PCIeLaneManager: React.FC<Props> = ({ currentGen, onGenChange }) => {
             </div>
          </div>
          <div className="p-6 bg-black/40 rounded-[1.5rem] border border-white/5 space-y-2 group shadow-inner">
-            <span className="text-[9px] font-black uppercase text-gray-700 tracking-[0.2em] group-hover:text-cyan-400 transition-colors">Parity Check</span>
+            <span className="text-[9px] font-black uppercase text-gray-500 tracking-[0.2em] group-hover:text-cyan-400 transition-colors">Parity Check</span>
             <div className="flex items-baseline gap-2">
                <span className="text-3xl font-black text-white font-mono tracking-tighter">100</span>
                <span className="text-[10px] font-mono text-cyan-500 uppercase font-bold">%</span>
@@ -108,7 +108,7 @@ const PCIeLaneManager: React.FC<Props> = ({ currentGen, onGenChange }) => {
 
       <button 
         onClick={() => { setIsReinitializing(true); setTimeout(() => setIsReinitializing(false), 1500); }}
-        className="w-full py-5 bg-white/[0.03] hover:bg-white/[0.08] rounded-2xl border border-white/10 text-[10px] font-black uppercase tracking-[0.4em] text-gray-600 hover:text-white transition-all flex items-center justify-center gap-4 group active:scale-[0.98]"
+        className="w-full py-5 bg-white/[0.03] hover:bg-white/[0.08] rounded-2xl border border-white/10 text-[10px] font-black uppercase tracking-[0.4em] text-gray-500 hover:text-white transition-all flex items-center justify-center gap-4 group active:scale-[0.98]"
       >
         {isReinitializing ? (
           <Loader2 className="w-4 h-4 animate-spin text-cyan-400" />
