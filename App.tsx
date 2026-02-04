@@ -41,7 +41,6 @@ const App: React.FC = () => {
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   
-  // Responsive check
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 1024);
@@ -141,7 +140,6 @@ const App: React.FC = () => {
       <div className="scanline" />
       <KeyboardShortcuts isOpen={isShortcutsOpen} onClose={() => setIsShortcutsOpen(false)} />
 
-      {/* FIXED SIDEBAR (Desktop) / BOTTOM NAV (Mobile) */}
       <aside className="fixed bottom-0 left-0 w-full h-16 lg:relative lg:w-20 lg:h-screen shrink-0 flex flex-row lg:flex-col items-center justify-around lg:justify-start lg:py-8 lg:gap-10 bg-black border-t lg:border-t-0 lg:border-r border-white/10 z-[100] shadow-[0_-10px_30px_rgba(0,0,0,0.8)]">
         <div className="hidden lg:block p-3 bg-emerald-500 rounded-2xl shadow-lg cursor-pointer hover:scale-105 transition-all active:scale-95">
           <Music className="text-black w-6 h-6" />
@@ -186,13 +184,11 @@ const App: React.FC = () => {
           </div>
         </header>
 
-        {/* SCROLLABLE VIEWPORT */}
         <div className="flex-grow overflow-y-auto p-4 lg:p-10 custom-scrollbar pb-24 lg:pb-10">
           <AnimatePresence mode="wait">
             {activeView === 'sequencer' ? (
-              <motion.div key="seq" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="grid grid-cols-12 gap-6 lg:gap-10 h-full">
-                {/* SEQUENCER AREA */}
-                <div className="col-span-12 xl:col-span-8 2xl:col-span-9 space-y-6 lg:space-y-10">
+              <motion.div key="seq" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col xl:grid xl:grid-cols-12 xl:gap-10">
+                <div className="xl:col-span-8 2xl:col-span-9 space-y-6 lg:space-y-10">
                   <DrumMachine externalState={sequencerState} onStateChange={setSequencerState} />
                   
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-10">
@@ -201,8 +197,7 @@ const App: React.FC = () => {
                   </div>
                 </div>
 
-                {/* METRICS & BLOCKCHAIN AREA */}
-                <div className="col-span-12 xl:col-span-4 2xl:col-span-3 flex flex-col gap-6 lg:gap-10">
+                <div className="mt-6 xl:mt-0 xl:col-span-4 2xl:col-span-3 flex flex-col gap-6 lg:gap-10">
                   <div className="glass-panel p-6 rounded-[2rem] lg:rounded-[2.5rem] border border-white/5 space-y-8 shadow-xl">
                     <div className="flex items-center justify-between">
                        <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-white flex items-center gap-3">
@@ -214,7 +209,6 @@ const App: React.FC = () => {
                     </div>
                   </div>
                   
-                  {/* Minima Status explicitly separated in flow */}
                   <MinimaStatus status={minima} isVerified={isNebulaAuthenticated} onVerify={() => setIsNebulaAuthenticated(true)} />
                 </div>
               </motion.div>
@@ -227,7 +221,6 @@ const App: React.FC = () => {
         </div>
       </main>
 
-      {/* AI Producer Sidebar / Overlay */}
       <AnimatePresence>
         {(isChatExpanded || !isMobile) && (
           <motion.aside 
@@ -236,14 +229,12 @@ const App: React.FC = () => {
             exit={isMobile ? { x: '100%' } : {}}
             className={`fixed inset-0 lg:relative lg:inset-auto z-[200] lg:z-50 flex flex-col border-l border-white/5 bg-[#010409] transition-all duration-500 shadow-[-20px_0_60px_rgba(0,0,0,0.6)]`}
           >
-            {/* Toggle Button (Desktop Only) */}
             {!isMobile && (
               <button onClick={() => setIsChatExpanded(!isChatExpanded)} className="absolute -left-5 top-24 z-[210] p-2.5 bg-emerald-500 text-black rounded-full shadow-2xl hover:scale-110 transition-transform active:scale-95">
                 {isChatExpanded ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
               </button>
             )}
 
-            {/* Close Button (Mobile Overlay Only) */}
             {isMobile && (
               <button onClick={() => setIsChatExpanded(false)} className="absolute top-6 right-6 z-[210] p-3 bg-white/5 text-white rounded-xl active:bg-white/10 transition-colors">
                 <X className="w-6 h-6" />
