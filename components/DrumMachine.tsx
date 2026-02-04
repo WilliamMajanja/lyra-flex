@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   Play, Pause, Trash2, Copy, Plus, Waves, Music, Activity, 
-  Settings2, ChevronDown, Monitor, Keyboard, Sliders
+  Settings2, ChevronDown, Monitor, Keyboard, Sliders, Volume2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DrumTrack, SequencerState, Clip } from '../types';
@@ -35,6 +35,30 @@ const DraggableBPM: React.FC<{ value: number, onChange: (newValue: number) => vo
     {value} <span className="text-[7px] lg:text-[10px] text-gray-500 uppercase tracking-tighter">BPM</span>
   </div>
 }
+
+const Knob: React.FC<{value: number, onChange: (v:number) => void, color: string}> = ({ value, onChange, color }) => {
+    const knobRef = useRef<HTMLDivElement>(null);
+    const handleMouseDown = (e: React.MouseEvent) => {
+        const startY = e.clientY;
+        const startValue = value;
+        const handleMouseMove = (moveEvent: MouseEvent) => {
+            const delta = (startY - moveEvent.clientY) / 100; // Sensitivity
+            onChange(Math.max(0, Math.min(1, startValue + delta)));
+        };
+        const handleMouseUp = () => {
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+        };
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+    };
+    return (
+        <div ref={knobRef} onMouseDown={handleMouseDown} className="w-8 h-8 rounded-full bg-black/60 border border-white/10 flex items-center justify-center cursor-ns-resize relative shadow-inner">
+            <div className={`absolute h-3 w-[3px] bg-${color}-400 rounded-full top-1`} style={{ transform: `rotate(${ -135 + (value * 270)}deg)`, transformOrigin: 'bottom center' }} />
+        </div>
+    );
+};
+
 
 const DrumMachine: React.FC<Props> = ({ externalState, onStateChange }) => {
   const [selectedTrackIdx, setSelectedTrackIdx] = useState(0);
@@ -194,6 +218,18 @@ const DrumMachine: React.FC<Props> = ({ externalState, onStateChange }) => {
     newTracks[tIdx] = { ...newTracks[tIdx], ...newProps };
     onStateChange({ ...externalState, tracks: newTracks });
   };
+  
+  const createNewClip = (tIdx: number) => {
+    const newTracks = [...externalState.tracks];
+    const track = newTracks[tIdx];
+    if (track.clips.length < 4) {
+      const newClip: Clip = { id: `clip_${Math.random()}`, steps: Array(16).fill(false), velocities: Array(16).fill(0.8), probabilities: Array(16).fill(1), pitches: Array(16).fill(12), length: 16, timeSignature: externalState.timeSignature };
+      track.clips.push(newClip);
+      track.activeClipIndex = track.clips.length - 1;
+      onStateChange({ ...externalState, tracks: newTracks });
+    }
+  };
+
 
   const updateClip = (tIdx: number, cIdx: number, newProps: Partial<Clip>) => {
     const newTracks = [...externalState.tracks];
@@ -227,7 +263,6 @@ const DrumMachine: React.FC<Props> = ({ externalState, onStateChange }) => {
   return (
     <div className="glass-panel p-4 lg:p-8 rounded-2xl lg:rounded-[2.5rem] border border-white/5 flex flex-col gap-4 lg:gap-8 h-full relative overflow-hidden shadow-2xl" onMouseUp={() => setIsPainting(false)} onTouchEnd={() => setIsPainting(false)}>
       
-      {/* HEADER SECTION - UPDATED BRANDING */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shrink-0">
          <div className="flex items-center gap-3 lg:gap-6 w-full md:w-auto justify-between md:justify-start">
             <h2 className="text-sm lg:text-xl font-black text-white uppercase tracking-[0.2em] flex items-center gap-2">
@@ -259,7 +294,6 @@ const DrumMachine: React.FC<Props> = ({ externalState, onStateChange }) => {
          </div>
       </div>
 
-      {/* STEP LOOP INDICATOR */}
       <div className="w-full flex gap-1 lg:gap-1.5 px-2">
          {Array.from({ length: 16 }).map((_, i) => (
            <div 
@@ -271,44 +305,54 @@ const DrumMachine: React.FC<Props> = ({ externalState, onStateChange }) => {
          ))}
       </div>
 
-      {/* MIDDLE SECTION: TRACKS & GRID */}
       <div className="flex-grow flex flex-col xl:flex-row gap-6 lg:gap-8 min-h-0">
-         {/* TRACK LIST - ENHANCED TOUCH TARGETS */}
-         <div className="w-full xl:w-80 flex xl:flex-col gap-3 shrink-0 overflow-x-auto xl:overflow-y-auto no-scrollbar pb-3 xl:pb-0">
+         <div className="w-full xl:w-96 flex xl:flex-col gap-3 shrink-0 overflow-x-auto xl:overflow-y-auto no-scrollbar pb-3 xl:pb-0">
             {externalState.tracks.map((track, tIdx) => {
                const isActive = selectedTrackIdx === tIdx;
                return (
-                <div key={track.id} className={`flex items-center gap-3 p-2.5 rounded-2xl transition-all relative shrink-0 xl:shrink border ${isActive ? 'bg-white/10 border-white/10 shadow-lg' : 'opacity-50 border-transparent hover:opacity-80'}`}>
-                   <div className="flex flex-col gap-1.5 items-center shrink-0">
-                      <div className={`w-6 h-6 rounded-full border border-white/10 bg-black/40 flex items-center justify-center ${isActive ? `text-${track.color}-400` : 'text-gray-600'}`}>
-                        <Waves className="w-3.5 h-3.5" />
-                      </div>
-                      <div className="flex gap-1">
-                        <button onClick={() => updateTrack(tIdx, { solo: !track.solo })} className={`w-5 h-5 flex items-center justify-center rounded text-[8px] font-black transition-colors ${track.solo ? 'bg-amber-500 text-black shadow-md shadow-amber-500/20' : 'bg-black/50 text-gray-500'}`}>S</button>
-                        <button onClick={() => updateTrack(tIdx, { mute: !track.mute })} className={`w-5 h-5 flex items-center justify-center rounded text-[8px] font-black transition-colors ${track.mute ? 'bg-red-500 text-black shadow-md shadow-red-500/20' : 'bg-black/50 text-gray-500'}`}>M</button>
-                      </div>
+                <div key={track.id} onClick={() => setSelectedTrackIdx(tIdx)} className={`flex items-center gap-3 p-2.5 rounded-2xl transition-all relative shrink-0 xl:shrink border cursor-pointer ${isActive ? 'bg-white/10 border-white/10 shadow-lg' : 'opacity-50 border-transparent hover:opacity-80 hover:bg-white/[0.03]'}`}>
+                   <div className="flex flex-col items-center gap-2">
+                        <span className={`text-[9px] font-black uppercase tracking-widest text-${track.color}-400`}>{track.name}</span>
+                        <div className="flex gap-1.5">
+                            <Knob value={track.frequency} onChange={v => updateTrack(tIdx, { frequency: v })} color={track.color} />
+                            <div className="w-2 bg-black/40 rounded-full overflow-hidden relative">
+                                <div className={`absolute bottom-0 w-full bg-${track.color}-500 transition-all`} style={{height: `${track.volume * 100}%`}} />
+                            </div>
+                            <input type="range" min="0" max="1" step="0.01" value={track.volume} onChange={e => updateTrack(tIdx, { volume: parseFloat(e.target.value) })} className={`w-10 accent-${track.color}-500`} style={{writingMode: 'vertical-lr', direction: 'rtl'}} />
+                        </div>
                    </div>
-                   <button onClick={() => setSelectedTrackIdx(tIdx)} className="w-24 lg:w-28 text-left p-2 rounded-xl bg-black/40 border border-transparent hover:border-white/5 flex flex-col gap-1.5 overflow-hidden transition-all active:bg-black/60">
-                      <span className={`text-[9px] lg:text-[11px] font-black uppercase tracking-widest text-${track.color}-400 truncate`}>{track.name}</span>
-                      <div className="h-1 bg-white/5 w-full rounded-full overflow-hidden shadow-inner"><div className={`h-full bg-${track.color}-500 transition-all`} style={{width: `${track.volume * 100}%`}} /></div>
-                   </button>
-                   <div className="flex gap-1.5 shrink-0">
-                      {track.clips.slice(0, 2).map((clip, cIdx) => (
-                         <button 
-                          key={clip.id} 
-                          onClick={() => updateTrack(tIdx, { activeClipIndex: cIdx })} 
-                          className={`w-8 h-8 lg:w-10 lg:h-10 rounded-xl transition-all border font-black text-[10px] active:scale-95 ${track.activeClipIndex === cIdx ? `bg-${track.color}-500 border-${track.color}-400 text-black shadow-lg` : 'bg-white/5 border-transparent text-gray-600 hover:text-white'}`}
-                        >
-                            {cIdx + 1}
-                         </button>
-                      ))}
+                   
+                   <div className="flex-grow grid grid-cols-2 grid-rows-2 gap-2">
+                      {Array.from({length: 4}).map((_, cIdx) => {
+                          const clip = track.clips[cIdx];
+                          if (clip) {
+                              return <button 
+                                key={clip.id} 
+                                onClick={(e) => { e.stopPropagation(); updateTrack(tIdx, { activeClipIndex: cIdx }) }} 
+                                className={`w-full h-10 rounded-xl transition-all border font-black text-[10px] active:scale-95 flex items-center justify-center ${track.activeClipIndex === cIdx ? `bg-${track.color}-500 border-${track.color}-400 text-black shadow-lg` : 'bg-white/5 border-transparent text-gray-600 hover:text-white'}`}
+                              >
+                                  {clip.steps.some(s => s) ? <Waves className="w-4 h-4" /> : <span className="text-gray-700">-</span>}
+                              </button>
+                          }
+                          return <button 
+                            key={cIdx} 
+                            onClick={(e) => { e.stopPropagation(); createNewClip(tIdx); }}
+                            className="w-full h-10 rounded-xl bg-black/40 border border-dashed border-white/10 text-white/20 hover:text-white hover:border-white/30 transition-all flex items-center justify-center"
+                          >
+                            <Plus className="w-4 h-4" />
+                          </button>
+                      })}
+                   </div>
+                   
+                   <div className="flex flex-col gap-1.5 shrink-0">
+                        <button onClick={(e) => { e.stopPropagation(); updateTrack(tIdx, { solo: !track.solo }) }} className={`w-7 h-7 flex items-center justify-center rounded-lg text-[9px] font-black transition-colors ${track.solo ? 'bg-amber-500 text-black shadow-md' : 'bg-black/50 text-gray-500'}`}>S</button>
+                        <button onClick={(e) => { e.stopPropagation(); updateTrack(tIdx, { mute: !track.mute }) }} className={`w-7 h-7 flex items-center justify-center rounded-lg text-[9px] font-black transition-colors ${track.mute ? 'bg-red-500 text-black shadow-md' : 'bg-black/50 text-gray-500'}`}>M</button>
                    </div>
                 </div>
                );
             })}
          </div>
 
-         {/* MAIN SEQUENCER GRID - SWIPE SCROLL OPTIMIZED */}
          {activeClip && (
             <div className="flex-grow bg-black/60 rounded-[2rem] p-4 lg:p-6 border border-white/5 overflow-hidden relative flex flex-col shadow-2xl">
                <div className="flex items-center justify-between mb-4 px-2">
@@ -353,7 +397,6 @@ const DrumMachine: React.FC<Props> = ({ externalState, onStateChange }) => {
          )}
       </div>
 
-      {/* PARAMETER EDITOR - FULL USABILITY ON MOBILE */}
       {activeClip && (
          <div className="h-52 lg:h-64 shrink-0 bg-black/50 rounded-[2rem] border border-white/5 p-4 lg:p-6 flex flex-col gap-4 shadow-2xl overflow-hidden">
             <div className="flex items-center justify-between px-2 shrink-0">

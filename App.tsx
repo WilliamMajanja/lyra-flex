@@ -13,6 +13,8 @@ import DeploymentTerminal from './components/DeploymentTerminal';
 import MinimaStatus from './components/MinimaStatus';
 import MonetizationPanel from './components/MonetizationPanel';
 import PCIeLaneManager from './components/PCIeLaneManager';
+import AbletonLinkManager from './components/AbletonLinkManager';
+import FmTransmitter from './components/FmTransmitter';
 import DrumMachine from './components/DrumMachine';
 import KeyboardShortcuts from './components/KeyboardShortcuts';
 import { askArchitect } from './services/geminiService';
@@ -64,7 +66,8 @@ const App: React.FC = () => {
   }, [isSingleNodeMode]);
 
   useEffect(() => {
-    setIsBroadcasting(sequencerState.isPlaying);
+    // This is a simulation hook. In a real app, this would be driven by the FmTransmitter's state.
+    // For now, we'll keep it tied to sequencer playback for visual feedback on the sidebar.
   }, [sequencerState.isPlaying]);
 
   useEffect(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), [chatHistory]);
@@ -191,9 +194,13 @@ const App: React.FC = () => {
                 <div className="xl:col-span-8 2xl:col-span-9 space-y-6 lg:space-y-10">
                   <DrumMachine externalState={sequencerState} onStateChange={setSequencerState} />
                   
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-10">
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-10">
                     <PCIeLaneManager currentGen={pcieGen} onGenChange={setPcieGen} />
-                    <MonetizationPanel onMint={(h) => setChatHistory(prev => [...prev, { role: 'assistant', text: `Registry Success. Session Hash: ${h}` }])} />
+                    <AbletonLinkManager />
+                    <FmTransmitter onStateChange={setIsBroadcasting} />
+                    <div className="lg:col-span-3">
+                      <MonetizationPanel onMint={(h) => setChatHistory(prev => [...prev, { role: 'assistant', text: `Registry Success. Session Hash: ${h}` }])} />
+                    </div>
                   </div>
                 </div>
 
